@@ -1,0 +1,31 @@
+# Root gitignore for FraudGuard AI
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+debug_output.json

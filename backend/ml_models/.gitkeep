@@ -1,0 +1,4 @@
+# Place your pre-trained PyTorch models here:
+# - deepfake_detector.pt
+# - voice_detector.pt
+# - document_detector.pt
