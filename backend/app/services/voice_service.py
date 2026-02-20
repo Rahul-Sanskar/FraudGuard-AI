@@ -5,7 +5,7 @@ import torch
 import logging
 import numpy as np
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Any
 import io
 import subprocess
 import tempfile
@@ -13,7 +13,7 @@ import os
 import shutil
 from app.core.config import settings
 from app.models.architectures import Wav2Vec2VoiceModel, load_model_with_state_dict
-from app.core.model_manager import model_manager
+from app.core.model_registry import model_registry
 
 logger = logging.getLogger(__name__)
 
@@ -75,73 +75,48 @@ def convert_webm_to_wav(webm_path: str) -> str:
 
 
 class VoiceService:
-    """Service for detecting voice spoofing and synthetic audio."""
+    """Service for detecting voice spoofing and synthetic audio with lazy loading."""
     
     def __init__(self):
-        self.model = None
-        self.mock_mode = False
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._load_model()
+        """Initialize service without loading model (lazy loading)."""
+        self.model_name = "voice_spoof_model.pt"
+        logger.info("VoiceService initialized (lazy loading enabled)")
     
-    def _load_model(self) -> None:
+    def _load_model_lazy(self) -> Any:
         """
-        Load the pre-trained voice spoofing detection model.
-        PRODUCTION SAFE: Falls back to mock mode if model unavailable.
-        """
-        model_name = "voice_spoof_model.pt"
-        model_path = model_manager.get_model_path(model_name)
+        Lazy load model on first use via ModelRegistry.
         
-        logger.info(f"Loading voice model from {model_path}")
-        
-        if not model_path.exists():
-            logger.warning(f"❌ Model file not found at {model_path}")
-            logger.warning("⚠️  Service will use MOCK predictions")
-            self.mock_mode = True
-            self.model = None
-            return
-        
-        try:
-            # Load the model checkpoint
-            checkpoint = torch.load(model_path, map_location=self.device)
+        Returns:
+            Loaded model
             
-            # Check if it's a state_dict (OrderedDict) or complete model
+        Raises:
+            FileNotFoundError: If model file doesn't exist
+            RuntimeError: If model loading fails
+        """
+        def load_fn(model_path: Path, device: torch.device) -> Any:
+            """Load voice model from checkpoint."""
+            logger.info("Loading voice model checkpoint...")
+            checkpoint = torch.load(model_path, map_location=device)
+            
+            # Check if it's a state_dict or complete model
             if isinstance(checkpoint, dict) and not hasattr(checkpoint, 'state_dict'):
-                # It's a state_dict - need to instantiate architecture
-                logger.info("Detected state_dict format. Loading with Wav2Vec2 architecture...")
-                
-                try:
-                    # Instantiate the model architecture
-                    model = Wav2Vec2VoiceModel(num_classes=1)
-                    
-                    # Load the state dict
-                    model.load_state_dict(checkpoint, strict=False)
-                    model.to(self.device)
-                    model.eval()
-                    
-                    self.model = model
-                    logger.info(f"✅ Voice model loaded successfully from {model_path}")
-                    
-                    # Verify model weights loaded correctly
-                    if hasattr(model, 'classifier') and len(model.classifier) > 4:
-                        classifier_weight = model.classifier[4].weight
-                        logger.info(f"Classifier weight mean: {classifier_weight.mean().item():.6f}")
-                        logger.info(f"Classifier weight std: {classifier_weight.std().item():.6f}")
-                except Exception as e:
-                    logger.error(f"Error loading state_dict: {e}")
-                    logger.warning("⚠️  Service will use MOCK predictions")
-                    self.mock_mode = True
-                    self.model = None
+                # It's a state_dict - instantiate architecture
+                model = Wav2Vec2VoiceModel(num_classes=1)
+                model.load_state_dict(checkpoint, strict=False)
+                model.to(device)
+                model.eval()
+                logger.info(f"✅ Voice model loaded from state_dict")
+                return model
             else:
                 # Model saved as complete object
-                self.model = checkpoint
-                self.model.to(self.device)
-                self.model.eval()
-                logger.info(f"✅ Voice model loaded successfully from {model_path}")
-        except Exception as e:
-            logger.error(f"Error loading voice model: {e}")
-            logger.warning("⚠️  Service will use MOCK predictions")
-            self.mock_mode = True
-            self.model = None
+                model = checkpoint
+                model.to(device)
+                model.eval()
+                logger.info(f"✅ Voice model loaded as complete object")
+                return model
+        
+        # Use registry to load model
+        return model_registry.load_model(self.model_name, load_fn)
     
     def _preprocess_audio(self, audio_bytes: bytes) -> torch.Tensor:
         """
@@ -316,39 +291,35 @@ class VoiceService:
         """
         Analyze audio file with automatic optimization.
         Handles large files by streaming and optimizing before inference.
+        Uses lazy loading - model loaded on first call.
         
         Args:
             audio_path: Path to audio file (any format supported by librosa/ffmpeg)
             
         Returns:
             Dict with risk_score, confidence, raw_logit, duration info
+            
+        Raises:
+            FileNotFoundError: If model file doesn't exist (HTTP 503)
+            RuntimeError: If model loading fails (HTTP 503)
         """
         logger.info("=" * 80)
         logger.info("VOICE ANALYSIS START (WITH AUDIO OPTIMIZATION)")
         logger.info("=" * 80)
         
-        # Check if in mock mode
-        if self.mock_mode or self.model is None:
-            logger.warning("⚠️  MOCK MODE: Returning simulated prediction")
-            return {
-                "risk_score": 0.28,
-                "confidence": 0.0,
-                "raw_logit": 0.0,
-                "duration_original": 0.0,
-                "duration_processed": 0.0,
-                "sample_rate": 16000,
-                "mock": True,
-                "message": "Model unavailable - using mock prediction"
-            }
+        # Lazy load model on first use
+        try:
+            model = self._load_model_lazy()
+        except (FileNotFoundError, RuntimeError) as e:
+            logger.error(f"Model loading failed: {e}")
+            raise  # Re-raise to trigger HTTP 503
         
         try:
             # Check if libraries are available
             if not AUDIO_LIBS_AVAILABLE:
                 raise ImportError("librosa and soundfile required. Install with: pip install librosa soundfile")
             
-            # Check if model is loaded
-            if self.mock_mode or self.model is None:
-                raise RuntimeError("Voice model not loaded. Cannot perform analysis.")
+            # Model already loaded via lazy loading above
             
             # Get file size
             file_size_mb = os.path.getsize(audio_path) / 1024 / 1024
@@ -381,17 +352,17 @@ class VoiceService:
             # Convert to tensor
             audio_tensor = torch.from_numpy(audio).float()
             audio_tensor = audio_tensor.unsqueeze(0)  # Add batch dimension: [1, samples]
-            audio_tensor = audio_tensor.to(self.device)
+            audio_tensor = audio_tensor.to(model_registry.device)
             
             logger.info(f"Input tensor shape: {audio_tensor.shape}")
             logger.info(f"Tensor stats - min: {audio_tensor.min():.3f}, max: {audio_tensor.max():.3f}, mean: {audio_tensor.mean():.3f}")
             
             # Run inference
             logger.info("Running Wav2Vec2 inference...")
-            self.model.eval()
+            model.eval()
             
             with torch.no_grad():
-                output = self.model(audio_tensor)
+                output = model(audio_tensor)
                 logger.info(f"Model output shape: {output.shape}")
                 logger.info(f"Raw output: {output}")
                 
@@ -433,23 +404,24 @@ class VoiceService:
     def analyze_audio(self, audio_bytes: bytes) -> dict:
         """
         Analyze audio for voice spoofing detection.
+        Uses lazy loading - model loaded on first call.
         
         Returns:
             Dict with risk_score, confidence, raw_logit
+            
+        Raises:
+            FileNotFoundError: If model file doesn't exist (HTTP 503)
+            RuntimeError: If model loading fails (HTTP 503)
         """
         logger.info("=== VOICE ANALYSIS START ===")
         logger.info(f"Received audio bytes: {len(audio_bytes)} bytes")
         
-        # Check if in mock mode
-        if self.mock_mode or self.model is None:
-            logger.warning("⚠️  MOCK MODE: Returning simulated prediction")
-            return {
-                "risk_score": 0.22,
-                "confidence": 0.0,
-                "raw_logit": 0.0,
-                "mock": True,
-                "message": "Model unavailable - using mock prediction"
-            }
+        # Lazy load model on first use
+        try:
+            model = self._load_model_lazy()
+        except (FileNotFoundError, RuntimeError) as e:
+            logger.error(f"Model loading failed: {e}")
+            raise  # Re-raise to trigger HTTP 503
         
         try:
             # Check if libraries are available
@@ -457,48 +429,25 @@ class VoiceService:
             logger.info(f"FFMPEG_AVAILABLE: {FFMPEG_AVAILABLE}")
             
             if not AUDIO_LIBS_AVAILABLE:
-                logger.error("Audio processing libraries not available!")
-                return {
-                    "risk_score": 0.20,
-                    "confidence": 0.80,
-                    "raw_logit": -1.39,
-                    "note": "Audio libraries not installed - using mock prediction"
-                }
+                raise ImportError("Audio processing libraries not available")
             
             if not FFMPEG_AVAILABLE:
-                logger.error("FFmpeg not available!")
-                return {
-                    "risk_score": 0.20,
-                    "confidence": 0.80,
-                    "raw_logit": -1.39,
-                    "note": "FFmpeg not found - using mock prediction"
-                }
+                raise RuntimeError("FFmpeg not available")
             
-            # Check if model is loaded
-            logger.info(f"Model loaded: {self.model is not None}")
-            if self.mock_mode or self.model is None:
-                logger.warning("Voice model not loaded, using mock prediction")
-                return {
-                    "risk_score": 0.20,
-                    "confidence": 0.0,
-                    "raw_logit": 0.0,
-                    "mock": True,
-                    "message": "Model not loaded - using mock prediction"
-                }
-            
+            # Model already loaded via lazy loading above
             logger.info("Starting audio analysis with real model...")
             logger.info("Converting WEBM to WAV using FFmpeg...")
             
             # Preprocess audio (WEBM → WAV → Tensor)
             audio_tensor = self._preprocess_audio(audio_bytes)
-            audio_tensor = audio_tensor.to(self.device)
+            audio_tensor = audio_tensor.to(model_registry.device)
             logger.info(f"Input tensor shape: {audio_tensor.shape}")
             
             # Run inference with no gradient computation
             logger.info("Running Wav2Vec2 inference...")
-            self.model.eval()
+            model.eval()
             with torch.no_grad():
-                output = self.model(audio_tensor)
+                output = model(audio_tensor)
                 logger.info(f"Model output shape: {output.shape}")
                 logger.info(f"Raw output: {output}")
                 
@@ -536,15 +485,8 @@ class VoiceService:
         except Exception as e:
             logger.error(f"!!! ERROR analyzing audio: {e}")
             logger.exception("Full traceback:")
-            logger.info("=== VOICE ANALYSIS FAILED - RETURNING MOCK ===")
-            # Return mock prediction instead of raising
-            return {
-                "risk_score": 0.20,
-                "confidence": 0.80,
-                "raw_logit": -1.39,
-                "error": str(e),
-                "note": "Error occurred during analysis - using mock prediction"
-            }
+            logger.info("=== VOICE ANALYSIS FAILED ===")
+            raise  # Re-raise to trigger HTTP 500
 
 
 # Singleton instance

@@ -15,7 +15,7 @@ from app.services.document_service import document_service
 from app.services.email_service import email_service
 from app.core.logging import get_logger
 from app.core.config import settings
-from app.core.model_manager import model_manager
+from app.core.model_registry import model_registry
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -69,43 +69,36 @@ async def health_check() -> HealthResponse:
 async def health_check_models():
     """
     Detailed health check endpoint showing model loading status.
-    Returns status of all ML models.
+    Returns status of all ML models with lazy loading info.
     """
-    status = model_manager.get_status()
+    registry_status = model_registry.get_status()
     
     return {
         "status": "healthy",
-        "model_directory": status["model_directory"],
+        "model_directory": registry_status["model_directory"],
+        "current_loaded_model": registry_status["current_model"],
+        "lazy_loading": "enabled",
         "models": {
             "deepfake": {
-                "loaded": deepfake_service.model is not None,
-                "mock_mode": deepfake_service.mock_mode,
-                "available": status["models"].get("deepfake_model_enhanced.pt", False),
-                "device": str(deepfake_service.device)
+                "name": deepfake_service.model_name,
+                "currently_loaded": model_registry.is_model_loaded(deepfake_service.model_name),
+                "device": str(registry_status["device"])
             },
             "voice": {
-                "loaded": voice_service.model is not None,
-                "mock_mode": voice_service.mock_mode,
-                "available": status["models"].get("voice_spoof_model.pt", False),
-                "device": str(voice_service.device)
+                "name": voice_service.model_name,
+                "currently_loaded": model_registry.is_model_loaded(voice_service.model_name),
+                "device": str(registry_status["device"])
             },
             "document": {
-                "loaded": document_service.model is not None,
-                "mock_mode": document_service.mock_mode,
-                "available": status["models"].get("document_model.pt", False),
-                "device": str(document_service.device)
+                "name": document_service.model_name,
+                "currently_loaded": model_registry.is_model_loaded(document_service.model_name),
+                "device": str(registry_status["device"])
             },
             "email": {
                 "loaded": email_service.model is not None,
-                "mock_mode": False,
                 "model_name": "ProsusAI/finbert",
                 "device": str(email_service.device)
             }
-        },
-        "summary": {
-            "total_models": status["total_models"],
-            "available_models": status["available_models"],
-            "storage_url_configured": status["storage_url_configured"]
         },
         "timestamp": datetime.utcnow()
     }
@@ -173,6 +166,12 @@ async def analyze_image(
         
     except HTTPException:
         raise
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        raise HTTPException(status_code=503, detail="Model not available. Please contact administrator.")
+    except RuntimeError as e:
+        logger.error(f"Model loading failed: {e}")
+        raise HTTPException(status_code=503, detail="Model loading failed. Please try again later.")
     except Exception as e:
         logger.error(f"Error in image analysis: {e}")
         logger.exception("Full traceback:")
@@ -212,6 +211,12 @@ async def analyze_video(
         log_analysis(db, "video", response)
         return response
         
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        raise HTTPException(status_code=503, detail="Model not available. Please contact administrator.")
+    except RuntimeError as e:
+        logger.error(f"Model loading failed: {e}")
+        raise HTTPException(status_code=503, detail="Model loading failed. Please try again later.")
     except Exception as e:
         logger.error(f"Error in video analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -292,6 +297,12 @@ async def analyze_audio(
         # Audio too long or invalid
         logger.error(f"Audio validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        raise HTTPException(status_code=503, detail="Model not available. Please contact administrator.")
+    except RuntimeError as e:
+        logger.error(f"Model loading failed: {e}")
+        raise HTTPException(status_code=503, detail="Model loading failed. Please try again later.")
     except Exception as e:
         logger.error(f"Error in audio analysis: {e}")
         logger.exception("Full traceback:")
@@ -364,6 +375,9 @@ async def analyze_document(
         # PDF/Poppler errors
         logger.error(f"Runtime error in document analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    except FileNotFoundError as e:
+        logger.error(f"Model file not found: {e}")
+        raise HTTPException(status_code=503, detail="Model not available. Please contact administrator.")
     except Exception as e:
         logger.error(f"Error in document analysis: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -431,9 +445,9 @@ async def test_voice_status():
     
     return {
         "AUDIO_LIBS_AVAILABLE": AUDIO_LIBS_AVAILABLE,
-        "model_loaded": voice_service.model is not None,
-        "mock_mode": voice_service.mock_mode,
-        "device": str(voice_service.device)
+        "model_name": voice_service.model_name,
+        "currently_loaded": model_registry.is_model_loaded(voice_service.model_name),
+        "device": str(model_registry.device)
     }
 
 
@@ -473,16 +487,16 @@ async def debug_info():
         },
         "models": {
             "deepfake": {
-                "loaded": deepfake_service.model is not None,
-                "mock_mode": deepfake_service.mock_mode
+                "name": deepfake_service.model_name,
+                "currently_loaded": model_registry.is_model_loaded(deepfake_service.model_name)
             },
             "voice": {
-                "loaded": voice_service.model is not None,
-                "mock_mode": voice_service.mock_mode
+                "name": voice_service.model_name,
+                "currently_loaded": model_registry.is_model_loaded(voice_service.model_name)
             },
             "document": {
-                "loaded": document_service.model is not None,
-                "mock_mode": document_service.mock_mode
+                "name": document_service.model_name,
+                "currently_loaded": model_registry.is_model_loaded(document_service.model_name)
             },
             "email": {
                 "loaded": email_service.model is not None,

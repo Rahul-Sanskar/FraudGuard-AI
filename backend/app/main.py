@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 from app.core.logging import setup_logging, get_logger
-from app.core.model_manager import model_manager
 from app.api.endpoints import router
 from app.models.database import Base
 from app.db.session import engine
@@ -21,11 +20,7 @@ async def lifespan(app: FastAPI):
     # Startup
     setup_logging()
     logger.info("Starting FraudGuard AI Platform")
-    
-    # Initialize model manager (checks model availability)
-    logger.info("Initializing model manager...")
-    status = model_manager.get_status()
-    logger.info(f"Model status: {status['available_models']}/{status['total_models']} models available")
+    logger.info("Lazy loading enabled - models will load on first use")
     
     # Create database tables
     Base.metadata.create_all(bind=engine)
