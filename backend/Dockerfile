@@ -44,7 +44,6 @@ ENV PATH=/root/.local/bin:$PATH
 
 # Copy only application code (models excluded via .dockerignore)
 COPY app/ ./app/
-COPY __init__.py .
 
 # Create ml_models directory (models will be downloaded at runtime)
 RUN mkdir -p ml_models
