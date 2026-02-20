@@ -1,0 +1,103 @@
+═══════════════════════════════════════════════════════════════
+🚀 FRAUDGUARD AI - QUICK DEPLOYMENT GUIDE
+═══════════════════════════════════════════════════════════════
+
+ARCHITECTURE: Backend (Railway) + Frontend (Netlify) - SEPARATE
+
+═══════════════════════════════════════════════════════════════
+STEP 1: PUSH TO GITHUB (2 minutes)
+═══════════════════════════════════════════════════════════════
+
+cd fraud-guard
+git init
+git add .
+git commit -m "Initial commit: FraudGuard AI"
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
+git branch -M main
+git push -u origin main
+
+═══════════════════════════════════════════════════════════════
+STEP 2: DEPLOY BACKEND TO RAILWAY (5 minutes)
+═══════════════════════════════════════════════════════════════
+
+1. Go to https://railway.app
+2. New Project → Deploy from GitHub repo
+3. Select your repository
+4. ⚠️  CRITICAL: Settings → Service → Root Directory = "backend"
+5. Variables tab → Add these:
+   DATABASE_URL=sqlite:///./fraudguard.db
+   SECRET_KEY=<generate-random-32-chars>
+   MODEL_PATH=ml_models
+   MAX_FILE_SIZE=104857600
+   LOG_LEVEL=INFO
+6. Wait for deployment (green checkmark)
+7. Copy your Railway URL
+
+Test: https://your-app.railway.app/api/v1/health
+
+═══════════════════════════════════════════════════════════════
+STEP 3: DEPLOY FRONTEND TO NETLIFY (3 minutes)
+═══════════════════════════════════════════════════════════════
+
+1. Go to https://app.netlify.com
+2. New site from Git → Select your repository
+3. Configure:
+   Base directory: frontend
+   Build command: npm run build
+   Publish directory: frontend/dist
+4. Environment variables:
+   VITE_API_URL=https://your-backend-url.railway.app
+5. Deploy site
+6. Open your Netlify URL
+
+Test: Upload an image in Static Detection
+
+═══════════════════════════════════════════════════════════════
+FILES CREATED FOR YOU
+═══════════════════════════════════════════════════════════════
+
+✅ backend/Procfile              - Railway process definition
+✅ backend/runtime.txt           - Python 3.11
+✅ backend/railway.json          - Railway config (4 workers)
+✅ backend/nixpacks.toml         - Build config (FFmpeg, Poppler)
+✅ frontend/netlify.toml         - Netlify config
+✅ RAILWAY_DEPLOYMENT_GUIDE.md   - Complete guide
+
+═══════════════════════════════════════════════════════════════
+VERIFICATION CHECKLIST
+═══════════════════════════════════════════════════════════════
+
+Backend:
+☐ Root directory = "backend" in Railway
+☐ All environment variables added
+☐ /api/v1/health returns 200 OK
+☐ /api/v1/health/models shows models loaded
+☐ No errors in Railway logs
+
+Frontend:
+☐ VITE_API_URL set correctly
+☐ Site loads without errors
+☐ API calls work (check Network tab)
+☐ All detection modules functional
+
+═══════════════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════
+
+"Railpack could not determine how to build"
+→ Set Root Directory to "backend" in Railway Settings
+
+"Module not found"
+→ Check requirements.txt is in backend directory
+
+"API calls fail"
+→ Check VITE_API_URL has no trailing slash
+
+"Models not loading"
+→ Ensure ml_models/*.pt files are in Git
+
+═══════════════════════════════════════════════════════════════
+TOTAL TIME: ~10 MINUTES
+═══════════════════════════════════════════════════════════════
+
+See RAILWAY_DEPLOYMENT_GUIDE.md for detailed instructions.
