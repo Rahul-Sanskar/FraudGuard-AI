@@ -1,439 +1,402 @@
-# 🛡️ FraudGuard AI - Multimodal Fraud Detection Platform
+# FraudGuard AI
 
-A production-ready AI platform for detecting fraud across multiple modalities: deepfake images/videos, voice spoofing, document tampering, and email impersonation (BEC).
+Enterprise-grade fraud detection platform powered by advanced AI. Detect deepfakes, voice spoofing, and document tampering with a professional, modern interface.
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
-- Python 3.11+
-- Node.js 18+
-- FFmpeg (for voice analysis)
+- **Deepfake Detection**: Analyze images and videos for manipulation using neural networks
+- **Voice Spoof Detection**: Identify synthetic and cloned voice recordings
+- **Document Verification**: Verify document authenticity and detect tampering
+- **Email Fraud Detection**: Detect C-suite impersonation and Business Email Compromise (BEC) using FinBERT
+- **Webcam Capture**: Real-time image capture for instant analysis
+- **Audio Recording**: Record and analyze voice in real-time
+- **Dark Mode**: Full dark mode support across the entire application
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
 
-### Local Development
+## Tech Stack
 
-```bash
-# Backend
-cd backend
-python -m venv venv
-venv\Scripts\activate  # Windows
-# source venv/bin/activate  # Linux/Mac
-pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2  # For local dev
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload
+### Backend
+- **Framework**: FastAPI (Python)
+- **ML Libraries**: PyTorch, OpenCV, Librosa
+- **Database**: SQLite
+- **API**: RESTful API with automatic documentation
 
-# Frontend (new terminal)
-cd frontend
-npm install
-npm run dev
-```
+### Frontend
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Routing**: React Router DOM
 
-**Access**: http://localhost:5173
+## Project Structure
 
-## 📋 Features
-
-### Detection Modes
-
-**Static Analysis**
-- 🎭 Deepfake Detection - Images & videos
-- 📄 Document Verification - PDFs & images  
-- 🎤 Voice Analysis - Audio files
-- 📧 Email Fraud Detection - BEC & phishing
-
-**Live Detection**
-- 📹 Live Webcam - Real-time deepfake detection with anti-spoofing
-- 🎙️ Live Voice - Real-time voice spoofing detection
-
-### Key Capabilities
-- ✅ Multi-modal fraud detection
-- ✅ Real-time analysis
-- ✅ Anti-spoofing for screen replay attacks (live webcam only)
-- ✅ Business Email Compromise (BEC) detection
-- ✅ PDF document support
-- ✅ Large audio file optimization
-- ✅ SQLite database (zero configuration)
-- ✅ Production-ready API
-
-## 🏗️ Architecture
-
-### Tech Stack
-- **Backend**: FastAPI + PyTorch + SQLAlchemy
-- **Frontend**: React + TypeScript + Vite + TailwindCSS
-- **Database**: SQLite (local) or PostgreSQL (production)
-- **ML Models**: EfficientNet-B3, Wav2Vec2, FinBERT
-
-### Project Structure
 ```
 fraud-guard/
 ├── backend/
 │   ├── app/
-│   │   ├── api/endpoints.py          # API routes
-│   │   ├── core/                     # Config & logging
-│   │   ├── db/session.py             # Database
-│   │   ├── models/                   # ML architectures & schemas
-│   │   └── services/                 # Detection services
-│   ├── ml_models/                    # Pre-trained models
-│   ├── Dockerfile                    # Optimized multi-stage build
-│   ├── .dockerignore                 # Excludes models from image
-│   └── requirements.txt              # Python dependencies
+│   │   ├── api/              # API endpoints
+│   │   ├── core/             # Core configuration
+│   │   ├── db/               # Database setup
+│   │   ├── models/           # Data models
+│   │   └── services/         # Business logic
+│   ├── ml_models/            # Trained ML models
+│   ├── tests/                # Backend tests
+│   ├── requirements.txt      # Python dependencies
+│   └── Dockerfile            # Backend container
 ├── frontend/
 │   ├── src/
-│   │   ├── components/               # React components
-│   │   ├── pages/                    # Page components
-│   │   ├── services/api.ts           # API client
-│   │   └── types/                    # TypeScript types
-│   ├── netlify.toml                  # Netlify config
-│   └── package.json                  # Node dependencies
-└── README.md
+│   │   ├── components/       # React components
+│   │   ├── pages/            # Page components
+│   │   ├── services/         # API services
+│   │   └── types/            # TypeScript types
+│   ├── package.json          # Node dependencies
+│   └── vite.config.ts        # Vite configuration
+└── README.md                 # This file
 ```
 
-## 🐳 Docker Image Optimization
+## Quick Start
 
-The Docker image is optimized for Railway deployment:
+### Prerequisites
+- Python 3.9+
+- Node.js 18+
+- npm or yarn
 
-- **Multi-stage build**: Separates build and runtime
-- **CPU-only PyTorch**: Reduces size by 2.7 GB
-- **Models excluded**: Loaded at runtime (saves 420 MB)
-- **Optimized dependencies**: opencv-headless, no test deps
-- **Final size**: ~2.4 GB (down from 6.8 GB)
+### Backend Setup
 
-### Dockerfile Features
-- Python 3.11 slim base
-- FFmpeg and Poppler for media processing
-- Non-root user for security
-- 4 Uvicorn workers for production
-- Health checks enabled
-
-## 🚀 Deployment
-
-### Backend (Railway)
-
-**1. Create Railway Project**
-- Go to https://railway.app
-- New Project → Deploy from GitHub repo
-- Select your repository
-- **IMPORTANT**: Settings → Service → Root Directory = `backend`
-
-**2. Environment Variables**
 ```bash
-DATABASE_URL=sqlite:///./fraudguard.db
-SECRET_KEY=<generate-random-32-chars>
-MODEL_PATH=ml_models
-MAX_FILE_SIZE=104857600
-LOG_LEVEL=INFO
+# Navigate to backend directory
+cd fraud-guard/backend
+
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# Linux/Mac:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file
+cp .env.example .env
+
+# Run the server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Generate SECRET_KEY:
+The backend API will be available at `http://localhost:8000`
+API documentation: `http://localhost:8000/docs`
+
+### Frontend Setup
+
 ```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))"
+# Navigate to frontend directory
+cd fraud-guard/frontend
+
+# Install dependencies
+npm install
+
+# Create .env file
+cp .env.example .env
+
+# Start development server
+npm run dev
 ```
 
-**3. Model Loading Options**
+The frontend will be available at `http://localhost:3000`
 
-**Option A: Railway Volume (Recommended)**
-- Add volume in Railway dashboard
-- Mount at `/app/ml_models`
-- Upload your .pt files once
-- Fast startup, no downloads
-
-**Option B: Cloud Storage**
-- Upload models to S3/GCS/Cloudflare R2
-- Set environment variables with URLs
-- Models download on first startup
-
-**4. Deploy**
-- Railway auto-deploys from GitHub
-- Build time: 8-12 minutes
-- Image size: ~2.4 GB
-- Test: `https://your-app.railway.app/api/v1/health`
-
-### Frontend (Netlify)
-
-**1. Create Netlify Site**
-- Go to https://app.netlify.com
-- New site from Git → Select repository
-- Base directory: `frontend`
-- Build command: `npm run build`
-- Publish directory: `frontend/dist`
-
-**2. Environment Variables**
-```bash
-VITE_API_URL=https://your-backend.railway.app
-```
-
-**3. Deploy**
-- Netlify auto-deploys from GitHub
-- Build time: 2-3 minutes
-- Test: Open your Netlify URL
-
-## 🔧 Technical Details
-
-### ML Models
-
-**Deepfake Detection**
-- Architecture: EfficientNet-B3
-- Input: 224x224 RGB images
-- Anti-spoofing: Screen pattern, glare, flatness detection
-- Live mode: Detects phone screen replay attacks
-- Static mode: Model-only inference
-
-**Voice Spoofing Detection**
-- Architecture: Wav2Vec2-based
-- Input: 16kHz mono audio, up to 30 seconds
-- Auto-optimization: Mono conversion, resampling, silence trimming
-- Supports: WAV, MP3, WEBM, large files (up to 100MB)
-
-**Document Tampering**
-- Architecture: EfficientNet-B3
-- Input: 224x224 RGB images
-- PDF Support: Multi-page analysis (first 3 pages)
-- Returns highest risk score across pages
-
-**Email Fraud Detection (BEC)**
-- Model: FinBERT (financial sentiment)
-- Hybrid: 70% rules + 30% model
-- Detects: Payment requests, authority impersonation, urgency
-- Hard gating: Auto-flags high-risk BEC patterns
-
-### Risk Thresholds
-- **Low Risk**: < 30%
-- **Medium Risk**: 30-70%
-- **High Risk**: > 70%
-
-## 💾 Database
-
-### SQLite (Default)
-- Zero configuration
-- Auto-created on first run
-- Located at `backend/fraudguard.db`
-- Perfect for development
-
-### PostgreSQL (Production)
-```bash
-# Add PostgreSQL service in Railway
-# Update DATABASE_URL environment variable
-# Tables created automatically
-```
-
-## 📊 API Endpoints
-
-### Analysis Endpoints
-```
-POST /api/v1/analyze/image       # Deepfake detection
-POST /api/v1/analyze/video       # Video analysis
-POST /api/v1/analyze/audio       # Voice spoofing
-POST /api/v1/analyze/document    # Document tampering
-POST /api/v1/analyze/email       # Email fraud
-```
-
-### Utility Endpoints
-```
-GET  /api/v1/health              # Health check
-GET  /api/v1/health/models       # Model status
-GET  /api/v1/debug               # Debug info
-GET  /docs                       # API documentation
-```
-
-## 🧪 Testing
-
-### Quick Test
-```bash
-# Health check
-curl https://your-backend-url.railway.app/api/v1/health
-
-# Model status
-curl https://your-backend-url.railway.app/api/v1/health/models
-```
-
-### Test Each Module
-1. **Deepfake Detection**: Upload image/video
-2. **Document Verification**: Upload PDF or image
-3. **Voice Analysis**: Upload audio file
-4. **Email Fraud**: Paste email with fraud keywords
-
-## 🐛 Troubleshooting
-
-### Voice Returns Mock Predictions
-**Solution**: Install FFmpeg
-```bash
-# Windows: Download from https://ffmpeg.org/download.html
-# Add to PATH, restart terminal
-ffmpeg -version
-```
-
-### Webcam Black Screen
-**Solutions**:
-1. Grant camera permissions in browser
-2. Close other apps using camera
-3. Try Chrome/Edge browser
-
-### PDF Upload Error
-**Solution**: Install Poppler
-```bash
-# Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases
-# Extract and add bin/ to PATH
-```
-
-### Railway Build Fails
-**Check**:
-1. Root directory set to `backend`
-2. All environment variables added
-3. Railway logs for specific errors
-
-## 🔒 Security
-
-- ✅ File type & size validation
-- ✅ Input sanitization
-- ✅ CORS configuration
-- ✅ Environment variables for secrets
-- ✅ Inference-only models (no training)
-- ✅ Database logging
-- ✅ Non-root Docker user
-
-## 📦 Dependencies
-
-### Backend Key Packages
-```
-fastapi==0.109.0
-uvicorn==0.27.0
-torch==2.1.2+cpu (CPU-only for production)
-transformers==4.36.2
-librosa==0.10.1
-opencv-python-headless==4.9.0.80
-pdf2image==1.17.0
-```
-
-### Frontend Key Packages
-```
-react==18.2.0
-typescript==5.2.2
-vite==5.0.8
-tailwindcss==3.4.1
-axios
-lucide-react
-```
-
-## 🎯 Key Features
-
-### Anti-Spoofing (Live Webcam Only)
-- Screen pattern detection (moire patterns)
-- Display glare analysis
-- Flatness detection (2D vs 3D)
-- Hard gating at 92% risk when screen detected
-- Static uploads skip anti-spoofing for faster processing
-
-### BEC Detection (Email)
-- Payment action detection (18 keywords)
-- Authority impersonation (12 terms)
-- Pressure indicators (12 urgency terms)
-- Executive signature detection
-- Hard gating at 88% risk for BEC patterns
-
-### Audio Optimization
-- Auto-converts to mono
-- Resamples to 16kHz
-- Trims silence
-- Limits to 30 seconds
-- Handles files up to 100MB
-
-### PDF Support
-- Multi-page analysis (first 3 pages)
-- Returns highest risk score
-- Requires Poppler for conversion
-
-## ✅ Deployment Checklist
-
-### Before Deployment
-- [ ] Code pushed to GitHub
-- [ ] No .env files in repository
-- [ ] No *.db files in repository
-- [ ] ML models present (for local dev) or configured for download
-- [ ] Dockerfile optimized
-- [ ] .dockerignore configured
-
-### Backend (Railway)
-- [ ] Service created from GitHub
-- [ ] Root directory set to `backend`
-- [ ] All environment variables added
-- [ ] Deployment successful
-- [ ] `/api/v1/health` returns 200 OK
-- [ ] `/api/v1/health/models` shows models loaded
-- [ ] No errors in logs
-
-### Frontend (Netlify)
-- [ ] Site created from GitHub
-- [ ] Base directory: `frontend`
-- [ ] VITE_API_URL environment variable set
-- [ ] Deployment successful
-- [ ] Site loads without errors
-- [ ] API calls work
-
-### Integration Testing
-- [ ] All detection modules work
-- [ ] File uploads work
-- [ ] No CORS errors
-- [ ] Response times < 5 seconds
-
-## 📝 Environment Variables
+## Environment Variables
 
 ### Backend (.env)
-```bash
-# Database
+```env
 DATABASE_URL=sqlite:///./fraudguard.db
-
-# Security
-SECRET_KEY=your-secret-key-change-in-production-min-32-characters
-
-# ML Models
 MODEL_PATH=./ml_models
-MAX_FILE_SIZE=104857600
-
-# Logging
-LOG_LEVEL=INFO
+CORS_ORIGINS=http://localhost:3000
 ```
 
 ### Frontend (.env)
-```bash
-VITE_API_URL=http://localhost:8000
+```env
+VITE_API_URL=http://localhost:8000/api/v1
 ```
 
-## 🤝 Contributing
+## API Endpoints
 
-Contributions welcome! Areas for improvement:
-- Additional fraud detection modalities
-- Model fine-tuning on domain-specific data
-- Performance optimizations
-- UI/UX enhancements
+### Health Check
+```
+GET /api/v1/health
+```
 
-## 📄 License
+### Analysis Endpoints
+```
+POST /api/v1/analyze/image      # Deepfake detection (image)
+POST /api/v1/analyze/video      # Deepfake detection (video)
+POST /api/v1/analyze/audio      # Voice spoof detection
+POST /api/v1/analyze/document   # Document verification
+POST /api/v1/analyze/email      # Email fraud detection (C-suite impersonation & BEC)
+```
 
-Proprietary - All rights reserved
+### Response Format
+```json
+{
+  "risk_score": 0.85,
+  "prediction": "High",
+  "confidence": 0.92,
+  "explanation": "Analysis details..."
+}
+```
 
-## 🆘 Support
+## Usage
 
-**Common Issues**:
-1. Voice mock predictions → Install FFmpeg
-2. Webcam black screen → Grant camera permissions
-3. PDF errors → Install Poppler
-4. Railway build fails → Check root directory setting
+### Deepfake Detection
+1. Navigate to "Deepfake" page
+2. Choose "Upload File" or "Use Webcam"
+3. Select/capture an image or video
+4. Click "Analyze for Deepfakes"
+5. View results with risk score and confidence
 
-**Debug Steps**:
-1. Check `/api/v1/health/models` - all models loaded?
-2. Check backend logs for errors
-3. Check browser console (F12) for frontend errors
-4. Verify environment variables set correctly
+### Voice Spoof Detection
+1. Navigate to "Voice" page
+2. Choose "Upload Audio" or "Record Audio"
+3. Select/record an audio file
+4. Click "Analyze Voice"
+5. View results with risk assessment
 
-## 🎉 Success Criteria
+### Document Verification
+1. Navigate to "Document" page
+2. Upload a document image or PDF
+3. Click "Verify Document"
+4. View authenticity results
 
-Your deployment is successful when:
-- [ ] Backend health check returns 200 OK
-- [ ] All models show "loaded: true"
-- [ ] Frontend loads without errors
-- [ ] All detection modules work
-- [ ] No errors in logs
-- [ ] Response times < 5 seconds
+### Email Fraud Detection
+1. Navigate to "Email" page
+2. Paste the email content into the text area
+3. Click "Analyze Email"
+4. View results showing:
+   - C-suite impersonation detection
+   - Business Email Compromise (BEC) indicators
+   - Payment request analysis
+   - Urgency and pressure tactics
+   - Risk assessment with confidence score
 
----
+## Development
 
-**Built with ❤️ using FastAPI, React, and PyTorch**
+### Backend Commands
+```bash
+# Run tests
+pytest
 
-**Repository**: https://github.com/Rahul-Sanskar/FraudGuard-AI
+# Run with auto-reload
+uvicorn app.main:app --reload
+
+# Check code style
+black app/
+flake8 app/
+```
+
+### Frontend Commands
+```bash
+# Development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
+```
+
+## Building for Production
+
+### Backend
+```bash
+# Using Docker
+docker build -t fraudguard-backend ./backend
+docker run -p 8000:8000 fraudguard-backend
+
+# Or manually
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Frontend
+```bash
+# Build
+npm run build
+
+# Output will be in dist/ folder
+# Deploy dist/ to any static hosting service
+```
+
+## Deployment
+
+### Backend Deployment Options
+- Docker container
+- AWS EC2 / Azure VM
+- Heroku
+- Google Cloud Run
+
+### Frontend Deployment Options
+- Vercel (recommended)
+- Netlify
+- AWS S3 + CloudFront
+- Any static hosting service
+
+### Quick Deploy to Vercel
+```bash
+cd frontend
+npm install -g vercel
+vercel
+```
+
+## Browser Support
+
+- Chrome/Edge (latest 2 versions)
+- Firefox (latest 2 versions)
+- Safari (latest 2 versions)
+- Mobile browsers (iOS Safari, Chrome Mobile)
+
+## Features in Detail
+
+### Webcam Capture
+- Live video preview
+- Multiple camera support
+- Device selection
+- Permission handling
+- Error recovery
+
+### Audio Recording
+- Real-time recording
+- Pause/Resume functionality
+- Recording timer
+- Permission handling
+- WebM format output
+
+### Email Fraud Detection (FinBERT)
+- **C-suite Impersonation Detection**: Identifies emails claiming to be from executives (CEO, CFO, etc.)
+- **Business Email Compromise (BEC)**: Detects payment fraud and wire transfer scams
+- **Hybrid Analysis**: Combines FinBERT NLP model (30%) with rule-based detection (70%)
+- **Pattern Recognition**: Identifies urgency tactics, payment requests, and authority claims
+- **Hard BEC Override**: Automatically flags high-risk patterns (payment + authority combination)
+- **Confidence Scoring**: Provides detailed risk assessment with explanation
+
+**What it detects:**
+- Urgent payment requests
+- Wire transfer scams
+- Executive impersonation
+- Pressure tactics
+- Confidentiality requests
+- Suspicious authority claims
+- Banking detail changes
+
+### Dark Mode
+- System preference detection
+- Manual toggle
+- Persistent preference
+- Smooth transitions
+
+### Error Handling
+- User-friendly error messages
+- Network error recovery
+- Permission denied handling
+- Timeout management
+
+## Security
+
+- CORS configuration
+- Input validation
+- File type restrictions
+- Size limits
+- Error boundaries
+- Secure API communication
+
+## Performance
+
+- Code splitting
+- Lazy loading
+- Optimized bundle size (~272 KB)
+- Fast initial load
+- Efficient re-renders
+
+## Accessibility
+
+- Keyboard navigation
+- ARIA labels
+- Focus indicators
+- Screen reader support
+- Color contrast compliance
+
+## Troubleshooting
+
+### Backend Issues
+
+**Port already in use:**
+```bash
+# Change port in command
+uvicorn app.main:app --port 8001
+```
+
+**Module not found:**
+```bash
+# Reinstall dependencies
+pip install -r requirements.txt
+```
+
+**Database errors:**
+```bash
+# Delete and recreate database
+rm fraudguard.db
+# Restart server to recreate
+```
+
+### Frontend Issues
+
+**Build fails:**
+```bash
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+npm run build
+```
+
+**API connection fails:**
+- Check `VITE_API_URL` in `.env`
+- Ensure backend is running
+- Check CORS configuration
+
+**Dark mode not working:**
+- Clear browser cache
+- Check localStorage
+- Verify ThemeProvider is wrapping App
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
+
+## License
+
+Proprietary - FraudGuard AI
+
+## Support
+
+For issues or questions:
+1. Check this README
+2. Review API documentation at `/docs`
+3. Check browser console for errors
+4. Verify environment variables
+5. Contact the development team
+
+## Acknowledgments
+
+Built with modern web technologies and best practices for enterprise-grade fraud detection.
