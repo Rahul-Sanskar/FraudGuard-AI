@@ -1,0 +1,99 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# ML Models (DO NOT include in Docker image)
+ml_models/*.pt
+ml_models/*.pth
+ml_models/*.bin
+ml_models/*.ckpt
+ml_models/*.onnx
+ml_models/*.h5
+ml_models/*.pkl
+ml_models/*.safetensors
+
+# Keep .gitkeep to preserve directory structure
+!ml_models/.gitkeep
+
+# Datasets
+datasets/
+data/
+*.csv
+*.json
+*.parquet
+
+# Notebooks
+*.ipynb
+notebooks/
+.ipynb_checkpoints/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+test.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Large assets
+*.mp4
+*.avi
+*.mov
+*.wav
+*.mp3
+*.flac
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Deployment files
+Dockerfile
+.dockerignore
+docker-compose.yml
+railway.json
+nixpacks.toml
+Procfile
+runtime.txt
+
+# Test files
+test_*.py
+*_test.py
+tests/
