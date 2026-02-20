@@ -105,24 +105,6 @@ export const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Platform Statistics */}
-      <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-        <h2 className="text-2xl font-bold mb-4">Platform Statistics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <p className="text-4xl font-bold text-blue-600">99.2%</p>
-            <p className="text-gray-600 mt-2">Detection Accuracy</p>
-          </div>
-          <div className="text-center">
-            <p className="text-4xl font-bold text-green-600">&lt;2s</p>
-            <p className="text-gray-600 mt-2">Average Analysis Time</p>
-          </div>
-          <div className="text-center">
-            <p className="text-4xl font-bold text-purple-600">24/7</p>
-            <p className="text-gray-600 mt-2">Real-time Monitoring</p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
