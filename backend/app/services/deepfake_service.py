@@ -2,76 +2,89 @@
 Deepfake detection service for image and video analysis.
 """
 import torch
+import logging
 import numpy as np
 from pathlib import Path
 from typing import Tuple
 from PIL import Image
 import cv2
 from io import BytesIO
-from app.core.logging import get_logger
 from app.core.config import settings
 from app.models.architectures import EfficientNetDeepfakeModel, load_model_with_state_dict
 from app.services.anti_spoof_service import AntiSpoofDetector
+from app.core.model_manager import model_manager
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class DeepfakeService:
     """Service for detecting deepfake images and videos with anti-spoofing."""
     
     def __init__(self):
-        self.model_path = Path(settings.MODEL_PATH) / "deepfake_model_enhanced.pt"
         self.model = None
+        self.mock_mode = False
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.anti_spoof = AntiSpoofDetector()
         self._load_model()
     
     def _load_model(self) -> None:
-        """Load the pre-trained deepfake detection model."""
+        """
+        Load the pre-trained deepfake detection model.
+        PRODUCTION SAFE: Falls back to mock mode if model unavailable.
+        """
+        model_name = "deepfake_model_enhanced.pt"
+        model_path = model_manager.get_model_path(model_name)
+        
+        logger.info(f"Loading deepfake model from {model_path}")
+        
+        if not model_path.exists():
+            logger.warning(f"❌ Model file not found at {model_path}")
+            logger.warning("⚠️  Service will use MOCK predictions")
+            self.mock_mode = True
+            self.model = None
+            return
+        
         try:
-            if self.model_path.exists():
-                logger.info(f"Loading deepfake model from {self.model_path}")
+            # Load the model checkpoint
+            checkpoint = torch.load(model_path, map_location=self.device)
+            
+            # Check if it's a state_dict (OrderedDict) or complete model
+            if isinstance(checkpoint, dict) and not hasattr(checkpoint, 'state_dict'):
+                # It's a state_dict - need to instantiate architecture
+                logger.info("Detected state_dict format. Loading with EfficientNet architecture...")
                 
-                # Load the model checkpoint
-                checkpoint = torch.load(self.model_path, map_location=self.device)
-                
-                # Check if it's a state_dict (OrderedDict) or complete model
-                if isinstance(checkpoint, dict) and not hasattr(checkpoint, 'state_dict'):
-                    # It's a state_dict - need to instantiate architecture
-                    logger.info("Detected state_dict format. Loading with EfficientNet architecture...")
+                try:
+                    # Instantiate the model architecture
+                    model = EfficientNetDeepfakeModel(num_classes=2)
                     
-                    try:
-                        # Instantiate the model architecture
-                        model = EfficientNetDeepfakeModel(num_classes=2)
-                        
-                        # Load the state dict
-                        model.load_state_dict(checkpoint, strict=False)
-                        model.to(self.device)
-                        model.eval()
-                        
-                        self.model = model
-                        logger.info(f"✅ Deepfake model loaded successfully from {self.model_path}")
-                        
-                        # Verify model weights loaded correctly
-                        if hasattr(model, 'head') and hasattr(model.head, '6'):
-                            classifier_weight = model.head[6].weight
-                            logger.info(f"Classifier weight mean: {classifier_weight.mean().item():.6f}")
-                            logger.info(f"Classifier weight std: {classifier_weight.std().item():.6f}")
-                    except Exception as e:
-                        logger.error(f"Error loading state_dict: {e}")
-                        logger.warning("Using mock predictions.")
-                        self.model = None
-                else:
-                    # Model saved as complete object
-                    self.model = checkpoint
-                    self.model.to(self.device)
-                    self.model.eval()
-                    logger.info(f"✅ Deepfake model loaded successfully from {self.model_path}")
+                    # Load the state dict
+                    model.load_state_dict(checkpoint, strict=False)
+                    model.to(self.device)
+                    model.eval()
+                    
+                    self.model = model
+                    logger.info(f"✅ Deepfake model loaded successfully from {model_path}")
+                    
+                    # Verify model weights loaded correctly
+                    if hasattr(model, 'head') and hasattr(model.head, '6'):
+                        classifier_weight = model.head[6].weight
+                        logger.info(f"Classifier weight mean: {classifier_weight.mean().item():.6f}")
+                        logger.info(f"Classifier weight std: {classifier_weight.std().item():.6f}")
+                except Exception as e:
+                    logger.error(f"Error loading state_dict: {e}")
+                    logger.warning("⚠️  Service will use MOCK predictions")
+                    self.mock_mode = True
+                    self.model = None
             else:
-                logger.warning(f"Model not found at {self.model_path}. Using mock predictions.")
+                # Model saved as complete object
+                self.model = checkpoint
+                self.model.to(self.device)
+                self.model.eval()
+                logger.info(f"✅ Deepfake model loaded successfully from {model_path}")
         except Exception as e:
             logger.error(f"Error loading deepfake model: {e}")
-            logger.warning("Using mock predictions.")
+            logger.warning("⚠️  Service will use MOCK predictions")
+            self.mock_mode = True
             self.model = None
     
     def _preprocess_image(self, image_bytes) -> torch.Tensor:
@@ -127,14 +140,18 @@ class DeepfakeService:
         """
         logger.info(f"=== IMAGE ANALYSIS START (is_live={is_live}) ===")
         
+        # Check if in mock mode
+        if self.mock_mode or self.model is None:
+            logger.warning("⚠️  MOCK MODE: Returning simulated prediction")
+            return {
+                "risk_score": 0.25,
+                "confidence": 0.0,
+                "raw_logit": 0.0,
+                "mock": True,
+                "message": "Model unavailable - using mock prediction"
+            }
+        
         try:
-            if self.model is None:
-                logger.warning("Model not loaded, using mock prediction")
-                return {
-                    "risk_score": 0.15,
-                    "confidence": 0.85,
-                    "raw_logit": -1.73
-                }
             
             # STEP 1: Anti-spoofing (ONLY for live webcam)
             spoof_score = 0.0
@@ -335,15 +352,19 @@ class DeepfakeService:
         Returns:
             Dict with risk_score, confidence, frame_count, highest_frame_score
         """
+        # Check if in mock mode
+        if self.mock_mode or self.model is None:
+            logger.warning("⚠️  MOCK MODE: Returning simulated prediction")
+            return {
+                "risk_score": 0.30,
+                "confidence": 0.0,
+                "frame_count": 0,
+                "highest_frame_score": 0.30,
+                "mock": True,
+                "message": "Model unavailable - using mock prediction"
+            }
+        
         try:
-            if self.model is None:
-                logger.warning("Model not loaded, using mock prediction")
-                return {
-                    "risk_score": 0.25,
-                    "confidence": 0.78,
-                    "frame_count": 0,
-                    "highest_frame_score": 0.25
-                }
             
             # Save video bytes to temporary file
             import tempfile

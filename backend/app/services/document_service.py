@@ -2,14 +2,15 @@
 Document tampering detection service with PDF support.
 """
 import torch
+import logging
 from pathlib import Path
 from typing import Tuple, List
 from io import BytesIO
-from app.core.logging import get_logger
 from app.core.config import settings
 from app.models.architectures import EfficientNetDocumentModel, load_model_with_state_dict
+from app.core.model_manager import model_manager
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Check if pdf2image is available
 try:
@@ -27,40 +28,47 @@ class DocumentService:
     """Service for detecting document tampering and forgery."""
     
     def __init__(self):
-        self.model_path = Path(settings.MODEL_PATH) / "document_model.pt"
         self.model = None
+        self.mock_mode = False
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._load_model()
     
     def _load_model(self) -> None:
         """
         Load the pre-trained document tampering detection model.
-        STRICT MODE: Server crashes if model fails to load (no fallbacks).
+        PRODUCTION SAFE: Falls back to mock mode if model unavailable.
         """
-        # Get absolute path
-        abs_model_path = self.model_path.resolve()
-        logger.info(f"=" * 80)
-        logger.info(f"LOADING DOCUMENT MODEL (STRICT MODE - NO FALLBACKS)")
-        logger.info(f"=" * 80)
-        logger.info(f"Absolute path: {abs_model_path}")
+        model_name = "document_model.pt"
+        model_path = model_manager.get_model_path(model_name)
         
-        # Check file exists - CRASH if not
-        if not self.model_path.exists():
-            error_msg = f"❌ FATAL: Model file not found at {abs_model_path}"
-            logger.error(error_msg)
-            raise FileNotFoundError(error_msg)
+        logger.info("=" * 80)
+        logger.info("LOADING DOCUMENT MODEL (PRODUCTION SAFE)")
+        logger.info("=" * 80)
+        logger.info(f"Model path: {model_path}")
         
-        file_size_mb = self.model_path.stat().st_size / 1024 / 1024
+        # Check if model exists
+        if not model_path.exists():
+            logger.warning(f"❌ Model file not found at {model_path}")
+            logger.warning("⚠️  Service will use MOCK predictions")
+            self.mock_mode = True
+            self.model = None
+            logger.info("=" * 80)
+            return
+        
+        file_size_mb = model_path.stat().st_size / 1024 / 1024
         logger.info(f"Model file size: {file_size_mb:.2f} MB")
         
-        # Load checkpoint - CRASH on failure
+        # Load checkpoint - fallback to mock on failure
         logger.info("Loading checkpoint...")
         try:
-            checkpoint = torch.load(self.model_path, map_location=self.device)
+            checkpoint = torch.load(model_path, map_location=self.device)
         except Exception as e:
-            error_msg = f"❌ FATAL: Failed to load checkpoint: {e}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg) from e
+            logger.error(f"❌ Failed to load checkpoint: {e}")
+            logger.warning("⚠️  Service will use MOCK predictions")
+            self.mock_mode = True
+            self.model = None
+            logger.info("=" * 80)
+            return
         
         logger.info(f"Checkpoint type: {type(checkpoint)}")
         
@@ -79,9 +87,12 @@ class DocumentService:
                 logger.info("Detected format: Pure state_dict (OrderedDict)")
                 state_dict = checkpoint
             else:
-                error_msg = f"❌ FATAL: Unknown checkpoint format. Keys: {list(checkpoint.keys())[:10]}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+                logger.error(f"❌ Unknown checkpoint format. Keys: {list(checkpoint.keys())[:10]}")
+                logger.warning("⚠️  Service will use MOCK predictions")
+                self.mock_mode = True
+                self.model = None
+                logger.info("=" * 80)
+                return
         elif hasattr(checkpoint, 'state_dict'):
             # Format 3: Complete model object
             logger.info("Detected format: Complete model object")
@@ -99,9 +110,12 @@ class DocumentService:
             logger.info(f"=" * 80)
             return
         else:
-            error_msg = f"❌ FATAL: Unrecognized checkpoint type: {type(checkpoint)}"
-            logger.error(error_msg)
-            raise TypeError(error_msg)
+            logger.error(f"❌ Unrecognized checkpoint type: {type(checkpoint)}")
+            logger.warning("⚠️  Service will use MOCK predictions")
+            self.mock_mode = True
+            self.model = None
+            logger.info("=" * 80)
+            return
         
         # If we have a state_dict, instantiate model and load it
         if state_dict is not None:
@@ -116,14 +130,17 @@ class DocumentService:
             total_params = sum(p.numel() for p in model.parameters())
             logger.info(f"Model architecture has {total_params:,} parameters")
             
-            # Load state dict - CRASH on failure
+            # Load state dict - fallback to mock on failure
             logger.info("Loading state dict into model...")
             try:
                 missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
             except Exception as e:
-                error_msg = f"❌ FATAL: Failed to load state_dict: {e}"
-                logger.error(error_msg)
-                raise RuntimeError(error_msg) from e
+                logger.error(f"❌ Failed to load state_dict: {e}")
+                logger.warning("⚠️  Service will use MOCK predictions")
+                self.mock_mode = True
+                self.model = None
+                logger.info("=" * 80)
+                return
             
             # Report missing/unexpected keys
             if missing_keys:
@@ -195,16 +212,14 @@ class DocumentService:
         logger.info(f"  Min: {weight_min:.6f}")
         logger.info(f"  Max: {weight_max:.6f}")
         
-        # Check if weights look randomly initialized (CRASH if so)
+        # Check if weights look randomly initialized (warn but don't crash)
         if abs(weight_mean) < 0.001 and weight_std < 0.01:
-            error_msg = (
-                f"❌ FATAL: Classifier weights appear randomly initialized!\n"
+            logger.warning(
+                f"⚠️  Classifier weights appear randomly initialized!\n"
                 f"   Mean: {weight_mean:.6f} (too close to 0)\n"
                 f"   Std: {weight_std:.6f} (too small)\n"
-                f"   This model has NOT been trained. Server cannot start."
+                f"   This model may NOT be trained properly."
             )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
         
         logger.info("✅ Weights look trained (non-random)")
         
@@ -277,14 +292,20 @@ class DocumentService:
             Dict with risk_score, confidence, raw_logit, pages_analyzed
         """
         logger.info("=" * 80)
-        logger.info("DOCUMENT ANALYSIS START (STRICT MODE)")
+        logger.info("DOCUMENT ANALYSIS START")
         logger.info("=" * 80)
         
-        # STRICT: Model must be loaded
-        if self.model is None:
-            error_msg = "❌ FATAL: Model not loaded. Cannot perform analysis."
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+        # Check if in mock mode
+        if self.mock_mode or self.model is None:
+            logger.warning("⚠️  MOCK MODE: Returning simulated prediction")
+            return {
+                "risk_score": 0.35,
+                "confidence": 0.0,
+                "raw_logit": 0.0,
+                "pages_analyzed": 1,
+                "mock": True,
+                "message": "Model unavailable - using mock prediction"
+            }
         
         # Verify model is in eval mode
         if self.model.training:

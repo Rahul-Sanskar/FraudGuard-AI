@@ -15,6 +15,7 @@ from app.services.document_service import document_service
 from app.services.email_service import email_service
 from app.core.logging import get_logger
 from app.core.config import settings
+from app.core.model_manager import model_manager
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -70,32 +71,41 @@ async def health_check_models():
     Detailed health check endpoint showing model loading status.
     Returns status of all ML models.
     """
+    status = model_manager.get_status()
+    
     return {
         "status": "healthy",
+        "model_directory": status["model_directory"],
         "models": {
             "deepfake": {
                 "loaded": deepfake_service.model is not None,
-                "path": str(deepfake_service.model_path),
-                "exists": deepfake_service.model_path.exists(),
+                "mock_mode": deepfake_service.mock_mode,
+                "available": status["models"].get("deepfake_model_enhanced.pt", False),
                 "device": str(deepfake_service.device)
             },
             "voice": {
                 "loaded": voice_service.model is not None,
-                "path": str(voice_service.model_path),
-                "exists": voice_service.model_path.exists(),
+                "mock_mode": voice_service.mock_mode,
+                "available": status["models"].get("voice_spoof_model.pt", False),
                 "device": str(voice_service.device)
             },
             "document": {
                 "loaded": document_service.model is not None,
-                "path": str(document_service.model_path),
-                "exists": document_service.model_path.exists(),
+                "mock_mode": document_service.mock_mode,
+                "available": status["models"].get("document_model.pt", False),
                 "device": str(document_service.device)
             },
             "email": {
                 "loaded": email_service.model is not None,
+                "mock_mode": False,
                 "model_name": "ProsusAI/finbert",
                 "device": str(email_service.device)
             }
+        },
+        "summary": {
+            "total_models": status["total_models"],
+            "available_models": status["available_models"],
+            "storage_url_configured": status["storage_url_configured"]
         },
         "timestamp": datetime.utcnow()
     }
@@ -422,8 +432,7 @@ async def test_voice_status():
     return {
         "AUDIO_LIBS_AVAILABLE": AUDIO_LIBS_AVAILABLE,
         "model_loaded": voice_service.model is not None,
-        "model_path": str(voice_service.model_path),
-        "model_exists": voice_service.model_path.exists(),
+        "mock_mode": voice_service.mock_mode,
         "device": str(voice_service.device)
     }
 
@@ -465,18 +474,15 @@ async def debug_info():
         "models": {
             "deepfake": {
                 "loaded": deepfake_service.model is not None,
-                "path": str(deepfake_service.model_path),
-                "exists": deepfake_service.model_path.exists()
+                "mock_mode": deepfake_service.mock_mode
             },
             "voice": {
                 "loaded": voice_service.model is not None,
-                "path": str(voice_service.model_path),
-                "exists": voice_service.model_path.exists()
+                "mock_mode": voice_service.mock_mode
             },
             "document": {
                 "loaded": document_service.model is not None,
-                "path": str(document_service.model_path),
-                "exists": document_service.model_path.exists()
+                "mock_mode": document_service.mock_mode
             },
             "email": {
                 "loaded": email_service.model is not None,
