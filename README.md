@@ -249,26 +249,41 @@ GET  /docs                       # API documentation
 
 ### Backend (Railway)
 
+**IMPORTANT**: When deploying to Railway, you must set the root directory to `backend`.
+
 1. **Create Railway Project**
-   - Connect GitHub repository
-   - Select `backend` as root directory
+   - Go to https://railway.app
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+   - **Set Root Directory**: Click "Settings" → "Service" → Set "Root Directory" to `backend`
 
 2. **Environment Variables**
+   Set in Railway dashboard (Settings → Variables):
    ```
    DATABASE_URL=sqlite:///./fraudguard.db
-   SECRET_KEY=your-secret-key-min-32-chars
+   SECRET_KEY=<generate-random-32-char-string>
    MODEL_PATH=ml_models
    MAX_FILE_SIZE=104857600
    LOG_LEVEL=INFO
    ```
 
-3. **Build Settings**
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+3. **Build Configuration**
+   Railway auto-detects Python using `nixpacks.toml`:
+   - Python 3.11
+   - FFmpeg (for audio)
+   - Poppler (for PDFs)
+   - Auto-installs from requirements.txt
 
-4. **Optional: Add PostgreSQL**
+4. **Verify Deployment**
+   - Check logs for "Application startup complete"
+   - Test: `https://your-app.railway.app/api/v1/health`
+   - Check models: `https://your-app.railway.app/api/v1/health/models`
+
+5. **Optional: Add PostgreSQL**
    - Add PostgreSQL service in Railway
-   - Update `DATABASE_URL` to PostgreSQL connection string
+   - Copy DATABASE_URL from PostgreSQL service
+   - Update environment variable
+   - Redeploy
 
 ### Frontend (Netlify)
 

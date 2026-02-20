@@ -129,9 +129,14 @@ BACKEND (Railway):
 1. Go to https://railway.app
 2. New Project → Deploy from GitHub
 3. Select repository
-4. Root directory: backend
-5. Add environment variables (see above)
-6. Deploy automatically
+4. **CRITICAL**: Settings → Service → Root Directory = "backend"
+5. Add environment variables:
+   DATABASE_URL=sqlite:///./fraudguard.db
+   SECRET_KEY=<generate-32-char-random-string>
+   MODEL_PATH=ml_models
+   MAX_FILE_SIZE=104857600
+   LOG_LEVEL=INFO
+6. Deploy automatically (nixpacks.toml configures build)
 
 FRONTEND (Netlify):
 1. Go to https://app.netlify.com
