@@ -156,6 +156,12 @@ POST /api/v1/analyze/email      # Email fraud detection (C-suite impersonation &
 4. Click "Analyze for Deepfakes"
 5. View results with risk score and confidence
 
+**Anti-Spoofing for Webcam:**
+- When using webcam capture, anti-spoofing is automatically enabled
+- The system will detect if you're showing a photo from your phone screen
+- Only real, live webcam captures will pass the authenticity check
+- Uploaded files are analyzed without anti-spoofing (for legitimate use cases)
+
 ### Voice Spoof Detection
 1. Navigate to "Voice" page
 2. Choose "Upload Audio" or "Record Audio"
@@ -271,6 +277,13 @@ vercel
 - Device selection
 - Permission handling
 - Error recovery
+- **Anti-Spoofing Protection**: Automatically detects screen replay attacks
+  - Detects phone displays showing photos
+  - Detects printed photos
+  - Detects video replay attacks
+  - Uses computer vision techniques (moire patterns, screen glare, flatness detection)
+  - Only real webcam captures are treated as authentic
+  - Uploaded files skip anti-spoofing checks
 
 ### Audio Recording
 - Real-time recording

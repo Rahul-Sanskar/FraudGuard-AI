@@ -19,11 +19,13 @@ export const DeepfakePage: React.FC = () => {
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [isFromWebcam, setIsFromWebcam] = useState(false);
   const { toasts, showToast, removeToast } = useToast();
 
   const handleFileSelect = useCallback((selectedFile: File) => {
     setFile(selectedFile);
     setResult(null);
+    setIsFromWebcam(false); // Mark as uploaded file
     
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -36,6 +38,7 @@ export const DeepfakePage: React.FC = () => {
     const capturedFile = new File([blob], 'webcam-capture.jpg', { type: 'image/jpeg' });
     setFile(capturedFile);
     setResult(null);
+    setIsFromWebcam(true); // Mark as webcam capture
     
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -50,6 +53,7 @@ export const DeepfakePage: React.FC = () => {
     setFile(null);
     setPreview(null);
     setResult(null);
+    setIsFromWebcam(false);
   }, []);
 
   const handleAnalyze = async () => {
@@ -65,7 +69,7 @@ export const DeepfakePage: React.FC = () => {
       const isVideo = file.type.startsWith('video/');
       const response = isVideo 
         ? await analyzeVideo(file)
-        : await analyzeImage(file, false);
+        : await analyzeImage(file, isFromWebcam); // Pass isFromWebcam flag
       
       setResult(response);
       showToast('Analysis completed successfully', 'success');
@@ -135,14 +139,29 @@ export const DeepfakePage: React.FC = () => {
           </Card>
 
           {file && !loading && !result && mode === 'upload' && (
-            <Button
-              variant="primary"
-              size="lg"
-              onClick={handleAnalyze}
-              className="w-full"
-            >
-              Analyze for Deepfakes
-            </Button>
+            <>
+              {isFromWebcam && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
+                      Anti-Spoofing Active
+                    </p>
+                  </div>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                    This image will be checked for screen replay attacks (phone displays, printed photos)
+                  </p>
+                </div>
+              )}
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleAnalyze}
+                className="w-full"
+              >
+                Analyze for Deepfakes
+              </Button>
+            </>
           )}
         </div>
 
